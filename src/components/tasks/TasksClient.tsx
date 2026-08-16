@@ -57,6 +57,13 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   rejected: { label: "مرفوضة", cls: "bg-red-50 text-red-700" },
   deferred: { label: "مؤجلة", cls: "bg-border text-muted" },
 };
+const BOARD_COLUMNS: { key: string; label: string; cls: string }[] = [
+  { key: "new", label: "جديدة", cls: "bg-blue-50 text-blue-700" },
+  { key: "in_progress", label: "قيد التنفيذ", cls: "bg-amber-50 text-amber-700" },
+  { key: "deferred", label: "مؤجلة", cls: "bg-border text-muted" },
+  { key: "done", label: "منجزة", cls: "bg-green-50 text-green-700" },
+  { key: "rejected", label: "مرفوضة", cls: "bg-red-50 text-red-700" },
+];
 const REL_LABEL: Record<string, string> = { merchant: "تاجر", sales_invoice: "فاتورة", product: "منتج" };
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -80,6 +87,9 @@ export default function TasksClient({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "mine" | "created">("all");
   const [commentText, setCommentText] = useState<Record<string, string>>({});
+  const [view, setView] = useState<"list" | "board">("list");
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -177,6 +187,28 @@ export default function TasksClient({
       else router.refresh();
     });
   }
+
+  // نقل بطاقة في اللوحة: تحديث تفاؤلي فوري ثم الدالة الآمنة
+  function moveTask(id: string, status: string) {
+    const t = tasks.find((x) => x.id === id);
+    const current = statusOverrides[id] ?? t?.status;
+    if (!t || current === status) return;
+    setRowError(null);
+    setStatusOverrides((o) => ({ ...o, [id]: status }));
+    startTransition(async () => {
+      const res = await changeStatus(id, status);
+      if (!res.ok) {
+        setRowError(res.error ?? "تعذّر نقل المهمة");
+        setStatusOverrides((o) => {
+          const n = { ...o };
+          delete n[id];
+          return n;
+        });
+      } else {
+        router.refresh();
+      }
+    });
+  }
   function submitComment(t: TaskRow) {
     const body = (commentText[t.id] ?? "").trim();
     if (!body) return;
@@ -228,26 +260,113 @@ export default function TasksClient({
         </div>
       )}
 
-      <div className="flex gap-2 border-b border-border">
-        {([
-          ["all", "الكل"],
-          ["mine", "مهامي"],
-          ["created", "أنشأتها"],
-        ] as const).map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => setFilter(k)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
-              filter === k ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex items-end justify-between gap-3 border-b border-border flex-wrap">
+        <div className="flex gap-2">
+          {([
+            ["all", "الكل"],
+            ["mine", "مهامي"],
+            ["created", "أنشأتها"],
+          ] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setFilter(k)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${
+                filter === k ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1 mb-1 bg-background border border-border rounded-lg p-0.5">
+          {([
+            ["list", "قائمة"],
+            ["board", "لوحة"],
+          ] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setView(k)}
+              className={`px-3 py-1 text-sm rounded-md transition ${
+                view === k ? "bg-primary text-white" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {rowError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{rowError}</p>}
 
+      {view === "board" && (
+        <div className="overflow-x-auto pb-2">
+          <div className="flex gap-3 min-w-max">
+            {BOARD_COLUMNS.map((col) => {
+              const cards = filtered.filter((t) => (statusOverrides[t.id] ?? t.status) === col.key);
+              return (
+                <div
+                  key={col.key}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData("text/plain");
+                    moveTask(id, col.key);
+                    setDragId(null);
+                  }}
+                  className="w-72 shrink-0 bg-background/60 border border-border rounded-xl p-2"
+                >
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <span className={`text-sm font-medium rounded-full px-2.5 py-0.5 ${col.cls}`}>{col.label}</span>
+                    <span className="text-xs text-muted tabular">{cards.length}</span>
+                  </div>
+                  <div className="space-y-2 mt-1 min-h-16">
+                    {cards.map((t) => {
+                      const pr = PRIORITY[t.priority] ?? PRIORITY.medium;
+                      const overdue = t.due_date && t.due_date < today() && col.key !== "done" && col.key !== "rejected";
+                      const canEdit = canCreate && (t.created_by === currentUserId || canViewAll);
+                      return (
+                        <div
+                          key={t.id}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("text/plain", t.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            setDragId(t.id);
+                          }}
+                          onDragEnd={() => setDragId(null)}
+                          onClick={() => canEdit && openEdit(t)}
+                          className={`bg-card border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing transition ${
+                            dragId === t.id ? "opacity-50" : "hover:border-primary"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium leading-snug">{t.title}</p>
+                            <span className={`text-[10px] rounded-full px-1.5 py-0.5 shrink-0 ${pr.cls}`}>{pr.label}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2 text-[11px] text-muted flex-wrap">
+                            {t.due_date && (
+                              <span className={overdue ? "text-red-600 font-medium" : ""}>⏱ {fmtDate(t.due_date)}</span>
+                            )}
+                            {t.assignees.length > 0 && <span>👤 {t.assignees.map((a) => a.name).join("، ")}</span>}
+                            {t.comments.length > 0 && <span>💬 {t.comments.length}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {cards.length === 0 && (
+                      <div className="text-center text-xs text-muted py-4 border border-dashed border-border rounded-lg">
+                        اسحب مهمة هنا
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {view === "list" && (
       <div className="space-y-3">
         {filtered.map((t) => {
           const pr = PRIORITY[t.priority] ?? PRIORITY.medium;
@@ -347,6 +466,7 @@ export default function TasksClient({
           <div className="bg-card border border-border rounded-xl px-4 py-12 text-center text-muted">لا توجد مهام.</div>
         )}
       </div>
+      )}
 
       <Modal open={open} onClose={() => setOpen(false)} title={editingId ? "تعديل مهمة" : "مهمة جديدة"} wide>
         <form onSubmit={submit} className="space-y-4">
