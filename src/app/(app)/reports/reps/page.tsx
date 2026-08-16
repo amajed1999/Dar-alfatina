@@ -20,10 +20,10 @@ export default async function RepsReportPage({
   });
 
   const list = data ?? [];
-  const headers = ["المندوب", "المبيعات", "عدد الفواتير", "التحصيلات", "عدد التجار", "نسبة التحصيل"];
+  const headers = ["المندوب", "المبيعات", "عدد الفواتير", "التحصيلات", "عدد التجار", "الزيارات", "نسبة التحصيل"];
   const rows = list.map((r) => {
     const ratio = r.sales_total > 0 ? Math.round((r.collections_total / r.sales_total) * 100) : 0;
-    return [r.rep_name, r.sales_total, r.invoices_count, r.collections_total, r.merchants_count, `${ratio}%`];
+    return [r.rep_name, r.sales_total, r.invoices_count, r.collections_total, r.merchants_count, r.visits_count, `${ratio}%`];
   });
 
   return (
@@ -60,6 +60,7 @@ export default async function RepsReportPage({
                 <th className="px-4 py-3 font-medium">الفواتير</th>
                 <th className="px-4 py-3 font-medium">التحصيلات</th>
                 <th className="px-4 py-3 font-medium">التجار</th>
+                <th className="px-4 py-3 font-medium">الزيارات</th>
                 <th className="px-4 py-3 font-medium">نسبة التحصيل</th>
               </tr>
             </thead>
@@ -73,18 +74,19 @@ export default async function RepsReportPage({
                     <td className="px-4 py-3 tabular">{fmtNum(r.invoices_count)}</td>
                     <td className="px-4 py-3 tabular">{fmtMoney(r.collections_total)}</td>
                     <td className="px-4 py-3 tabular">{fmtNum(r.merchants_count)}</td>
+                    <td className="px-4 py-3 tabular">{fmtNum(r.visits_count)}</td>
                     <td className={`px-4 py-3 tabular ${ratio >= 80 ? "text-green-700" : ratio >= 50 ? "text-amber-600" : "text-red-600"}`}>{ratio}%</td>
                   </tr>
                 );
               })}
               {list.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted">لا بيانات مندوبين في الفترة.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">لا بيانات مندوبين في الفترة.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
-      <p className="text-xs text-muted no-print">ملاحظة: عدد الزيارات ونسبة تحقيق الهدف تتطلب وحدة تتبّع زيارات لاحقة (خارطة الطريق).</p>
+      <p className="text-xs text-muted no-print">ملاحظة: «الزيارات» تُسجَّل ميدانياً من صفحة التجار (زرّ 📍 زيارة). «نسبة تحقيق الهدف» تتطلب تحديد أهداف شهرية للمندوبين (خارطة الطريق).</p>
     </div>
   );
 }

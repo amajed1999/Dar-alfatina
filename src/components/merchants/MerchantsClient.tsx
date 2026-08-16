@@ -9,7 +9,9 @@ import {
   createMerchant,
   updateMerchant,
   setMerchantStatus,
+  logVisit,
   type MerchantPayload,
+  type VisitInput,
 } from "@/app/(app)/merchants/actions";
 
 export type MerchantRow = {
@@ -37,6 +39,7 @@ type Props = {
   canViewAll: boolean;
   canCreate: boolean;
   canEdit: boolean;
+  canVisit: boolean;
 };
 
 type FormState = {
@@ -72,6 +75,7 @@ export default function MerchantsClient({
   canViewAll,
   canCreate,
   canEdit,
+  canVisit,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -80,6 +84,65 @@ export default function MerchantsClient({
   const [form, setForm] = useState<FormState>(emptyForm);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // زيارة
+  const [visitFor, setVisitFor] = useState<MerchantRow | null>(null);
+  const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [visitOutcome, setVisitOutcome] = useState<VisitInput["outcome"]>("other");
+  const [visitNotes, setVisitNotes] = useState("");
+  const [visitErr, setVisitErr] = useState<string | null>(null);
+
+  function openVisit(m: MerchantRow) {
+    setVisitFor(m);
+    setGps(null);
+    setGpsStatus("idle");
+    setVisitOutcome("other");
+    setVisitNotes("");
+    setVisitErr(null);
+    captureGps();
+  }
+  function captureGps() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGpsStatus("error");
+      return;
+    }
+    setGpsStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGps({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          acc: Math.round(pos.coords.accuracy),
+        });
+        setGpsStatus("ok");
+      },
+      () => setGpsStatus("error"),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  }
+  function submitVisit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!visitFor) return;
+    setVisitErr(null);
+    const input: VisitInput = {
+      merchant_id: visitFor.id,
+      latitude: gps?.lat ?? null,
+      longitude: gps?.lng ?? null,
+      accuracy: gps?.acc ?? null,
+      outcome: visitOutcome,
+      notes: visitNotes.trim() || null,
+    };
+    startTransition(async () => {
+      const res = await logVisit(input);
+      if (!res.ok) {
+        setVisitErr(res.error ?? "تعذّر تسجيل الزيارة");
+        return;
+      }
+      setVisitFor(null);
+      router.refresh();
+    });
+  }
 
   const repName = (id: string | null) =>
     id ? reps.find((r) => r.id === id)?.full_name ?? "—" : "—";
@@ -206,7 +269,7 @@ export default function MerchantsClient({
                 <th className="px-4 py-3 font-medium">الرصيد</th>
                 {canViewAll && <th className="px-4 py-3 font-medium">المندوب</th>}
                 <th className="px-4 py-3 font-medium">الحالة</th>
-                {canEdit && <th className="px-4 py-3 font-medium">إجراء</th>}
+                {(canEdit || canVisit) && <th className="px-4 py-3 font-medium">إجراء</th>}
               </tr>
             </thead>
             <tbody>
@@ -252,22 +315,34 @@ export default function MerchantsClient({
                         </span>
                       )}
                     </td>
-                    {canEdit && (
+                    {(canEdit || canVisit) && (
                       <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openEdit(m)}
-                            className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition"
-                          >
-                            تعديل
-                          </button>
-                          <button
-                            disabled={pending}
-                            onClick={() => toggleStatus(m)}
-                            className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition disabled:opacity-40"
-                          >
-                            {m.status === "active" ? "إيقاف" : "تفعيل"}
-                          </button>
+                        <div className="flex gap-2 flex-wrap">
+                          {canVisit && (
+                            <button
+                              onClick={() => openVisit(m)}
+                              className="text-sm bg-primary/10 text-primary border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/20 transition"
+                            >
+                              📍 زيارة
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button
+                              onClick={() => openEdit(m)}
+                              className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition"
+                            >
+                              تعديل
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button
+                              disabled={pending}
+                              onClick={() => toggleStatus(m)}
+                              className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition disabled:opacity-40"
+                            >
+                              {m.status === "active" ? "إيقاف" : "تفعيل"}
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}
@@ -406,6 +481,84 @@ export default function MerchantsClient({
             <button
               type="button"
               onClick={() => setModalOpen(false)}
+              className="border border-border rounded-lg py-2.5 px-6 text-sm hover:bg-background transition"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!visitFor}
+        onClose={() => setVisitFor(null)}
+        title={`تسجيل زيارة: ${visitFor?.name ?? ""}`}
+      >
+        <form onSubmit={submitVisit} className="space-y-4">
+          <div className="bg-background rounded-lg px-4 py-3 text-sm">
+            {gpsStatus === "loading" && <span className="text-muted">جارٍ تحديد الموقع…</span>}
+            {gpsStatus === "ok" && gps && (
+              <span className="text-green-700">
+                📍 تم تحديد الموقع (دقة ~{gps.acc} م){" "}
+                <a
+                  href={`https://maps.google.com/?q=${gps.lat},${gps.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  عرض على الخريطة
+                </a>
+              </span>
+            )}
+            {gpsStatus === "error" && (
+              <span className="text-amber-700">
+                تعذّر تحديد الموقع (قد يكون مرفوضاً).{" "}
+                <button type="button" onClick={captureGps} className="text-primary hover:underline">
+                  إعادة المحاولة
+                </button>{" "}
+                — يمكنك التسجيل بلا موقع.
+              </span>
+            )}
+            {gpsStatus === "idle" && (
+              <button type="button" onClick={captureGps} className="text-primary hover:underline">
+                تحديد الموقع
+              </button>
+            )}
+          </div>
+
+          <Field label="نتيجة الزيارة">
+            <select
+              value={visitOutcome}
+              onChange={(e) => setVisitOutcome(e.target.value as VisitInput["outcome"])}
+              className={inputCls}
+            >
+              <option value="order">طلبية</option>
+              <option value="collection">تحصيل</option>
+              <option value="follow_up">متابعة</option>
+              <option value="no_order">بلا طلب</option>
+              <option value="other">أخرى</option>
+            </select>
+          </Field>
+          <Field label="ملاحظات">
+            <input
+              value={visitNotes}
+              onChange={(e) => setVisitNotes(e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+
+          {visitErr && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{visitErr}</p>}
+
+          <div className="flex gap-3 pt-1">
+            <button
+              disabled={pending}
+              className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg py-2.5 px-6 text-sm font-medium transition disabled:opacity-60"
+            >
+              {pending ? "جارٍ التسجيل…" : "تسجيل الزيارة"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisitFor(null)}
               className="border border-border rounded-lg py-2.5 px-6 text-sm hover:bg-background transition"
             >
               إلغاء

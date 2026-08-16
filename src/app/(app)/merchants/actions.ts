@@ -106,3 +106,35 @@ export async function setMerchantStatus(
   revalidatePath("/merchants");
   return { ok: true };
 }
+
+export type VisitInput = {
+  merchant_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  accuracy: number | null;
+  outcome: "order" | "collection" | "follow_up" | "no_order" | "other";
+  notes: string | null;
+};
+
+/** تسجيل زيارة ميدانية لتاجر مع الموقع (GPS). */
+export async function logVisit(input: VisitInput): Promise<ActionResult> {
+  const ctx = await ctxWith(PERMISSIONS.merchants.visit);
+  if (!ctx) return { ok: false, error: "غير مصرح لك بتسجيل الزيارات." };
+  if (!input.merchant_id) return { ok: false, error: "التاجر مطلوب." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("merchant_visits").insert({
+    merchant_id: input.merchant_id,
+    rep_id: ctx.userId,
+    latitude: input.latitude,
+    longitude: input.longitude,
+    accuracy: input.accuracy,
+    outcome: input.outcome,
+    notes: input.notes,
+    created_by: ctx.userId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/visits");
+  revalidatePath("/reports/reps");
+  return { ok: true };
+}

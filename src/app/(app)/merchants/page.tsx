@@ -61,6 +61,7 @@ export default async function MerchantsPage() {
       canViewAll={canViewAll}
       canCreate={ctx.permissions.has(PERMISSIONS.merchants.create)}
       canEdit={ctx.permissions.has(PERMISSIONS.merchants.edit)}
+      canVisit={ctx.permissions.has(PERMISSIONS.merchants.visit)}
     />
   );
 }

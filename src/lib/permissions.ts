@@ -11,6 +11,7 @@ export const PERMISSIONS = {
     edit: "merchants.edit",
     delete: "merchants.delete",
     approveCredit: "merchants.approve_credit",
+    visit: "merchants.visit",
   },
   products: {
     view: "products.view",

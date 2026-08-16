@@ -267,6 +267,62 @@ export type Database = {
           },
         ]
       }
+      merchant_visits: {
+        Row: {
+          accuracy: number | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          merchant_id: string
+          metadata: Json
+          notes: string | null
+          outcome: string
+          rep_id: string | null
+          visited_at: string
+        }
+        Insert: {
+          accuracy?: number | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          merchant_id: string
+          metadata?: Json
+          notes?: string | null
+          outcome?: string
+          rep_id?: string | null
+          visited_at?: string
+        }
+        Update: {
+          accuracy?: number | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          merchant_id?: string
+          metadata?: Json
+          notes?: string | null
+          outcome?: string
+          rep_id?: string | null
+          visited_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_visits_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchants: {
         Row: {
           address: string | null
@@ -1791,6 +1847,7 @@ export type Database = {
           invoices_count: number
           collections_total: number
           merchants_count: number
+          visits_count: number
         }[]
       }
       report_sales_by_merchant: {
