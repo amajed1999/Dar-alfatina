@@ -93,3 +93,44 @@ export async function removeTask(id: string): Promise<ActionResult> {
   revalidatePath("/tasks");
   return { ok: true };
 }
+
+// ---------------- المرفقات ----------------
+// الرفع الفعلي للملف يتم من المتصفح إلى التخزين؛ هذه تسجّل البيانات الوصفية.
+export async function addAttachment(
+  taskId: string,
+  storagePath: string,
+  fileName: string,
+  fileSize: number,
+  mimeType: string | null,
+): Promise<ActionResult> {
+  const ctx = await getSessionContext();
+  if (!ctx) return { ok: false, error: "غير مصرح." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("task_attachments").insert({
+    task_id: taskId,
+    storage_path: storagePath,
+    file_name: fileName,
+    file_size: fileSize,
+    mime_type: mimeType,
+    uploaded_by: ctx.userId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/tasks");
+  return { ok: true };
+}
+
+export async function removeAttachment(
+  id: string,
+  storagePath: string,
+): Promise<ActionResult> {
+  const ctx = await getSessionContext();
+  if (!ctx) return { ok: false, error: "غير مصرح." };
+
+  const supabase = await createClient();
+  await supabase.storage.from("task-attachments").remove([storagePath]);
+  const { error } = await supabase.from("task_attachments").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/tasks");
+  return { ok: true };
+}

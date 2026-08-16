@@ -13,7 +13,7 @@ export default async function TasksPage() {
       supabase
         .from("tasks")
         .select(
-          "id, title, description, priority, due_date, status, related_type, related_id, created_by, created_at, task_assignees(user_id, user_profiles(full_name)), task_comments(id, body, created_at, user_id, user_profiles(full_name))",
+          "id, title, description, priority, due_date, status, related_type, related_id, created_by, created_at, task_assignees(user_id, user_profiles(full_name)), task_comments(id, body, created_at, user_id, user_profiles(full_name)), task_attachments(id, storage_path, file_name, file_size, created_at)",
         )
         .is("deleted_at", null)
         .order("created_at", { ascending: false }),
@@ -72,6 +72,15 @@ export default async function TasksPage() {
         body: c.body,
         created_at: c.created_at,
         author: (c.user_profiles as { full_name: string | null } | null)?.full_name ?? "—",
+      }))
+      .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    attachments: (t.task_attachments ?? [])
+      .map((a) => ({
+        id: a.id,
+        storage_path: a.storage_path,
+        file_name: a.file_name,
+        file_size: a.file_size,
+        created_at: a.created_at,
       }))
       .sort((a, b) => a.created_at.localeCompare(b.created_at)),
   }));

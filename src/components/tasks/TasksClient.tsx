@@ -10,12 +10,22 @@ import {
   changeStatus,
   addComment,
   removeTask,
+  addAttachment,
+  removeAttachment,
   type TaskInput,
 } from "@/app/(app)/tasks/actions";
+import { createClient } from "@/lib/supabase/client";
 
 export type Option = { id: string; label: string };
 type Assignee = { user_id: string; name: string };
 type Comment = { id: string; body: string; created_at: string; author: string };
+type Attachment = {
+  id: string;
+  storage_path: string;
+  file_name: string;
+  file_size: number | null;
+  created_at: string;
+};
 export type TaskRow = {
   id: string;
   title: string;
@@ -30,6 +40,7 @@ export type TaskRow = {
   created_at: string;
   assignees: Assignee[];
   comments: Comment[];
+  attachments: Attachment[];
 };
 
 type Props = {
@@ -90,6 +101,7 @@ export default function TasksClient({
   const [view, setView] = useState<"list" | "board">("list");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
   const [dragId, setDragId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -229,6 +241,51 @@ export default function TasksClient({
       else router.refresh();
     });
   }
+
+  async function onUpload(t: TaskRow, file: File) {
+    setRowError(null);
+    setUploadingId(t.id);
+    try {
+      const supabase = createClient();
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "";
+      const path = `${t.id}/${crypto.randomUUID()}${ext ? "." + ext : ""}`;
+      const { error: upErr } = await supabase.storage
+        .from("task-attachments")
+        .upload(path, file, { upsert: false });
+      if (upErr) {
+        setRowError(upErr.message);
+        return;
+      }
+      const res = await addAttachment(t.id, path, file.name, file.size, file.type || null);
+      if (!res.ok) setRowError(res.error ?? "تعذّر تسجيل المرفق");
+      else router.refresh();
+    } catch {
+      setRowError("تعذّر رفع الملف.");
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  async function onDownload(a: Attachment) {
+    const supabase = createClient();
+    const { data } = await supabase.storage
+      .from("task-attachments")
+      .createSignedUrl(a.storage_path, 120, { download: a.file_name });
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+    else setRowError("تعذّر فتح الملف.");
+  }
+
+  function onRemoveAttachment(a: Attachment) {
+    if (!confirm(`حذف المرفق «${a.file_name}»؟`)) return;
+    startTransition(async () => {
+      const res = await removeAttachment(a.id, a.storage_path);
+      if (!res.ok) setRowError(res.error ?? "تعذّر حذف المرفق");
+      else router.refresh();
+    });
+  }
+
+  const fmtSize = (n: number | null) =>
+    n == null ? "" : n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 
   return (
     <div className="space-y-6">
@@ -430,6 +487,35 @@ export default function TasksClient({
                         <button disabled={pending} onClick={() => doDelete(t)} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">حذف</button>
                       </>
                     )}
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium mb-2">المرفقات</p>
+                    <div className="space-y-1.5 mb-2">
+                      {t.attachments.map((a) => (
+                        <div key={a.id} className="flex items-center gap-2 text-sm bg-card border border-border rounded-lg px-3 py-2">
+                          <button onClick={() => onDownload(a)} className="text-primary hover:underline text-right truncate flex-1">
+                            📎 {a.file_name}
+                          </button>
+                          <span className="text-xs text-muted tabular shrink-0">{fmtSize(a.file_size)}</span>
+                          <button onClick={() => onRemoveAttachment(a)} className="text-muted hover:text-red-600 text-lg leading-none shrink-0" aria-label="حذف المرفق">×</button>
+                        </div>
+                      ))}
+                      {t.attachments.length === 0 && <p className="text-sm text-muted">لا مرفقات.</p>}
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition cursor-pointer">
+                      {uploadingId === t.id ? "جارٍ الرفع…" : "+ إرفاق ملف"}
+                      <input
+                        type="file"
+                        className="hidden"
+                        disabled={uploadingId === t.id}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) onUpload(t, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
                   </div>
 
                   <div>
