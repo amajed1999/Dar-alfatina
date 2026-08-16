@@ -1827,6 +1827,14 @@ export type Database = {
         Args: Record<string, never>
         Returns: number
       }
+      monthly_sales: {
+        Args: { p_months?: number }
+        Returns: {
+          month_start: string
+          sales_total: number
+          collected_total: number
+        }[]
+      }
       item_movement: {
         Args: { p_product: string; p_from?: string; p_to?: string }
         Returns: {

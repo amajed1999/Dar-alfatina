@@ -129,9 +129,11 @@ export default function TasksClient({
     const td = today();
     for (const t of tasks) {
       if (t.status === "done") s.done++;
-      else {
+      else if (t.status === "rejected") {
+        // مرفوضة = مغلقة، لا تُحسب ضمن المفتوحة
+      } else {
         s.open++;
-        if (t.due_date && t.due_date < td && t.status !== "rejected") s.overdue++;
+        if (t.due_date && t.due_date < td) s.overdue++;
       }
     }
     return s;

@@ -97,6 +97,8 @@ export default function ProductsClient({
   const [cats, setCats] = useState<Category[]>(categories);
   const [newCat, setNewCat] = useState("");
 
+  const defaultTier = tiers.find((t) => t.key === "wholesale") ?? tiers[0];
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
@@ -243,6 +245,7 @@ export default function ProductsClient({
                 <th className="px-4 py-3 font-medium">الوحدة</th>
                 <th className="px-4 py-3 font-medium">المتوفّر</th>
                 {canViewPrices && <th className="px-4 py-3 font-medium">التكلفة</th>}
+                {canViewPrices && <th className="px-4 py-3 font-medium">سعر البيع ({defaultTier?.name_ar ?? "جملة"})</th>}
                 <th className="px-4 py-3 font-medium">الحالة</th>
                 {canEdit && <th className="px-4 py-3 font-medium">إجراء</th>}
               </tr>
@@ -274,6 +277,13 @@ export default function ProductsClient({
                   {canViewPrices && (
                     <td className="px-4 py-3 tabular">
                       {p.current_cost != null ? fmtMoney(p.current_cost) : "—"}
+                    </td>
+                  )}
+                  {canViewPrices && (
+                    <td className="px-4 py-3 tabular font-medium">
+                      {defaultTier && pricesByProduct[p.id]?.[defaultTier.id] != null
+                        ? fmtMoney(pricesByProduct[p.id][defaultTier.id])
+                        : "—"}
                     </td>
                   )}
                   <td className="px-4 py-3">
@@ -311,7 +321,7 @@ export default function ProductsClient({
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={canViewPrices ? (canEdit ? 8 : 7) : canEdit ? 7 : 6}
+                    colSpan={canViewPrices ? (canEdit ? 9 : 8) : canEdit ? 7 : 6}
                     className="px-4 py-10 text-center text-muted"
                   >
                     لا توجد منتجات مطابقة.

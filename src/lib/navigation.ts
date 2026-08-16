@@ -61,6 +61,7 @@ export const NAV: NavSection[] = [
       { href: "/users", label: "المستخدمون", permission: PERMISSIONS.admin.usersManage },
       { href: "/roles", label: "الأدوار والصلاحيات", permission: PERMISSIONS.admin.rolesManage },
       { href: "/settings", label: "الإعدادات", permission: PERMISSIONS.admin.settingsManage },
+      { href: "/audit", label: "سجل التدقيق", permission: PERMISSIONS.admin.auditView },
     ],
   },
 ];
