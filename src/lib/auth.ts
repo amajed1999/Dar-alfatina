@@ -10,6 +10,8 @@ export type SessionContext = {
   roleKey: string | null;
   roleNameAr: string | null;
   permissions: Set<string>;
+  /** إن كان المستخدم حساب بوابة تاجر — معرّف التاجر المرتبط */
+  portalMerchantId: string | null;
 };
 
 /**
@@ -46,6 +48,17 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 
   const role = profile?.roles as { key: string; name_ar: string } | null;
 
+  // حساب بوابة التاجر (إن وُجد)
+  let portalMerchantId: string | null = null;
+  if (!roleId) {
+    const { data: link } = await supabase
+      .from("merchant_users")
+      .select("merchant_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    portalMerchantId = link?.merchant_id ?? null;
+  }
+
   return {
     userId: user.id,
     email: user.email ?? null,
@@ -55,6 +68,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
     roleKey: role?.key ?? null,
     roleNameAr: role?.name_ar ?? null,
     permissions,
+    portalMerchantId,
   };
 }
 

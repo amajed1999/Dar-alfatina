@@ -11,7 +11,7 @@ export default async function MerchantsPage() {
   const canManage = ctx.permissions.has(PERMISSIONS.admin.usersManage);
   const supabase = await createClient();
 
-  const [{ data: merchants }, { data: balances }, { data: tiers }] = await Promise.all([
+  const [{ data: merchants }, { data: balances }, { data: tiers }, { data: portalLinks }] = await Promise.all([
     supabase
       .from("merchants")
       .select(
@@ -21,7 +21,10 @@ export default async function MerchantsPage() {
       .order("name"),
     supabase.from("v_merchant_balances").select("merchant_id, balance"),
     supabase.from("price_tiers").select("id, name_ar, sort_order").order("sort_order"),
+    supabase.from("merchant_users").select("merchant_id"),
   ]);
+
+  const portalSet = new Set((portalLinks ?? []).map((p) => p.merchant_id));
 
   const balanceMap: Record<string, number> = {};
   for (const b of balances ?? []) {
@@ -51,6 +54,7 @@ export default async function MerchantsPage() {
     status: m.status as "active" | "suspended",
     notes: m.notes,
     balance: balanceMap[m.id] ?? 0,
+    has_portal: portalSet.has(m.id),
   }));
 
   return (
@@ -62,6 +66,7 @@ export default async function MerchantsPage() {
       canCreate={ctx.permissions.has(PERMISSIONS.merchants.create)}
       canEdit={ctx.permissions.has(PERMISSIONS.merchants.edit)}
       canVisit={ctx.permissions.has(PERMISSIONS.merchants.visit)}
+      canLinkPortal={ctx.permissions.has(PERMISSIONS.merchants.edit)}
     />
   );
 }

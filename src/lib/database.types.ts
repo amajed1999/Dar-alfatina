@@ -267,6 +267,35 @@ export type Database = {
           },
         ]
       }
+      merchant_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          merchant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          merchant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          merchant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_users_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchant_visits: {
         Row: {
           accuracy: number | null
@@ -1834,6 +1863,39 @@ export type Database = {
           sales_total: number
           collected_total: number
         }[]
+      }
+      portal_summary: {
+        Args: Record<string, never>
+        Returns: {
+          merchant_id: string
+          merchant_name: string
+          shop_name: string
+          balance: number
+          credit_limit: number
+          over_limit: boolean
+          open_invoices: number
+        }[]
+      }
+      portal_invoices: {
+        Args: Record<string, never>
+        Returns: {
+          invoice_id: string
+          invoice_number: string
+          invoice_date: string
+          sale_type: string
+          total: number
+          paid_amount: number
+          remaining: number
+          status: string
+        }[]
+      }
+      link_merchant_portal: {
+        Args: { p_merchant: string; p_email: string }
+        Returns: undefined
+      }
+      unlink_merchant_portal: {
+        Args: { p_merchant: string }
+        Returns: undefined
       }
       item_movement: {
         Args: { p_product: string; p_from?: string; p_to?: string }

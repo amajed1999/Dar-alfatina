@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/Sidebar";
@@ -9,6 +10,9 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const ctx = await requireSession();
+
+  // حساب بوابة تاجر -> واجهة التاجر (لا تطبيق الموظفين)
+  if (ctx.portalMerchantId) redirect("/portal");
 
   // مستخدم مسجّل لكنه غير مفعّل أو بلا دور -> شاشة انتظار التفعيل
   if (!ctx.isActive || !ctx.roleId) {

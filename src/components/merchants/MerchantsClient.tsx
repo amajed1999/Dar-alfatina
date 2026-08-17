@@ -10,6 +10,8 @@ import {
   updateMerchant,
   setMerchantStatus,
   logVisit,
+  linkPortal,
+  unlinkPortal,
   type MerchantPayload,
   type VisitInput,
 } from "@/app/(app)/merchants/actions";
@@ -28,6 +30,7 @@ export type MerchantRow = {
   status: "active" | "suspended";
   notes: string | null;
   balance: number;
+  has_portal: boolean;
 };
 type Tier = { id: string; name_ar: string; sort_order: number };
 type Rep = { id: string; full_name: string };
@@ -40,6 +43,7 @@ type Props = {
   canCreate: boolean;
   canEdit: boolean;
   canVisit: boolean;
+  canLinkPortal: boolean;
 };
 
 type FormState = {
@@ -76,6 +80,7 @@ export default function MerchantsClient({
   canCreate,
   canEdit,
   canVisit,
+  canLinkPortal,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -140,6 +145,44 @@ export default function MerchantsClient({
         return;
       }
       setVisitFor(null);
+      router.refresh();
+    });
+  }
+
+  // بوابة التاجر
+  const [portalFor, setPortalFor] = useState<MerchantRow | null>(null);
+  const [portalEmail, setPortalEmail] = useState("");
+  const [portalErr, setPortalErr] = useState<string | null>(null);
+
+  function openPortal(m: MerchantRow) {
+    setPortalFor(m);
+    setPortalEmail("");
+    setPortalErr(null);
+  }
+  function submitPortalLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!portalFor) return;
+    setPortalErr(null);
+    startTransition(async () => {
+      const res = await linkPortal(portalFor.id, portalEmail);
+      if (!res.ok) {
+        setPortalErr(res.error ?? "تعذّر الربط");
+        return;
+      }
+      setPortalFor(null);
+      router.refresh();
+    });
+  }
+  function doUnlinkPortal() {
+    if (!portalFor) return;
+    setPortalErr(null);
+    startTransition(async () => {
+      const res = await unlinkPortal(portalFor.id);
+      if (!res.ok) {
+        setPortalErr(res.error ?? "تعذّر فكّ الربط");
+        return;
+      }
+      setPortalFor(null);
       router.refresh();
     });
   }
@@ -269,7 +312,7 @@ export default function MerchantsClient({
                 <th className="px-4 py-3 font-medium">الرصيد</th>
                 {canViewAll && <th className="px-4 py-3 font-medium">المندوب</th>}
                 <th className="px-4 py-3 font-medium">الحالة</th>
-                {(canEdit || canVisit) && <th className="px-4 py-3 font-medium">إجراء</th>}
+                {(canEdit || canVisit || canLinkPortal) && <th className="px-4 py-3 font-medium">إجراء</th>}
               </tr>
             </thead>
             <tbody>
@@ -315,7 +358,7 @@ export default function MerchantsClient({
                         </span>
                       )}
                     </td>
-                    {(canEdit || canVisit) && (
+                    {(canEdit || canVisit || canLinkPortal) && (
                       <td className="px-4 py-3">
                         <div className="flex gap-2 flex-wrap">
                           {canVisit && (
@@ -324,6 +367,18 @@ export default function MerchantsClient({
                               className="text-sm bg-primary/10 text-primary border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/20 transition"
                             >
                               📍 زيارة
+                            </button>
+                          )}
+                          {canLinkPortal && (
+                            <button
+                              onClick={() => openPortal(m)}
+                              className={`text-sm border rounded-lg px-3 py-1.5 transition ${
+                                m.has_portal
+                                  ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                                  : "border-border hover:bg-background"
+                              }`}
+                            >
+                              {m.has_portal ? "🔓 بوابة" : "🔗 بوابة"}
                             </button>
                           )}
                           {canEdit && (
@@ -565,6 +620,64 @@ export default function MerchantsClient({
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={!!portalFor}
+        onClose={() => setPortalFor(null)}
+        title={`بوابة التاجر: ${portalFor?.name ?? ""}`}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted leading-relaxed">
+            تتيح البوابة للتاجر تسجيل الدخول لرؤية رصيده وفواتيره وكشف حسابه (قراءة فقط).
+            يجب أن ينشئ التاجر حساباً من صفحة التسجيل أولاً، ثم تربط بريده هنا.
+          </p>
+          {portalFor?.has_portal ? (
+            <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
+              ✓ هذا التاجر مرتبط بحساب بوابة حالياً.
+            </div>
+          ) : (
+            <div className="bg-background rounded-lg px-3 py-2 text-sm text-muted">لا حساب بوابة مرتبط بعد.</div>
+          )}
+          <form onSubmit={submitPortalLink} className="space-y-3">
+            <Field label="بريد حساب التاجر">
+              <input
+                type="email"
+                value={portalEmail}
+                onChange={(e) => setPortalEmail(e.target.value)}
+                dir="ltr"
+                placeholder="merchant@example.com"
+                className={inputCls}
+              />
+            </Field>
+            {portalErr && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{portalErr}</p>}
+            <div className="flex gap-3 pt-1 flex-wrap">
+              <button
+                disabled={pending}
+                className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg py-2.5 px-6 text-sm font-medium transition disabled:opacity-60"
+              >
+                {pending ? "جارٍ…" : "ربط الحساب"}
+              </button>
+              {portalFor?.has_portal && (
+                <button
+                  type="button"
+                  onClick={doUnlinkPortal}
+                  disabled={pending}
+                  className="border border-red-200 text-red-700 rounded-lg py-2.5 px-6 text-sm hover:bg-red-50 transition disabled:opacity-40"
+                >
+                  فكّ الربط
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPortalFor(null)}
+                className="border border-border rounded-lg py-2.5 px-6 text-sm hover:bg-background transition"
+              >
+                إغلاق
+              </button>
+            </div>
+          </form>
+        </div>
       </Modal>
     </div>
   );

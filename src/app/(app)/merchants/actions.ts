@@ -138,3 +138,30 @@ export async function logVisit(input: VisitInput): Promise<ActionResult> {
   revalidatePath("/reports/reps");
   return { ok: true };
 }
+
+/** ربط حساب بوابة لتاجر (بالبريد — يجب أن يكون التاجر قد سجّل حساباً أولاً). */
+export async function linkPortal(merchantId: string, email: string): Promise<ActionResult> {
+  const ctx = await ctxWith(PERMISSIONS.merchants.edit);
+  if (!ctx) return { ok: false, error: "غير مصرح لك." };
+  if (!email.trim()) return { ok: false, error: "البريد مطلوب." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("link_merchant_portal", {
+    p_merchant: merchantId,
+    p_email: email.trim(),
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/merchants");
+  return { ok: true };
+}
+
+export async function unlinkPortal(merchantId: string): Promise<ActionResult> {
+  const ctx = await ctxWith(PERMISSIONS.merchants.edit);
+  if (!ctx) return { ok: false, error: "غير مصرح لك." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("unlink_merchant_portal", { p_merchant: merchantId });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/merchants");
+  return { ok: true };
+}
