@@ -208,10 +208,14 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
           category_id: string | null
           created_at: string
           created_by: string | null
           currency: string
+          decision_note: string | null
           deleted_at: string | null
           description: string | null
           exchange_rate: number
@@ -225,10 +229,14 @@ export type Database = {
         }
         Insert: {
           amount: number
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
+          decision_note?: string | null
           deleted_at?: string | null
           description?: string | null
           exchange_rate?: number
@@ -242,10 +250,14 @@ export type Database = {
         }
         Update: {
           amount?: number
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
+          decision_note?: string | null
           deleted_at?: string | null
           description?: string | null
           exchange_rate?: number
@@ -1975,6 +1987,10 @@ export type Database = {
       }
       decide_request: {
         Args: { p_task_id: string; p_approve: boolean; p_note: string | null }
+        Returns: undefined
+      }
+      decide_expense: {
+        Args: { p_id: string; p_approve: boolean; p_note: string | null }
         Returns: undefined
       }
       update_task: {

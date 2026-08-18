@@ -23,6 +23,7 @@ const ICON: Record<string, string> = {
   order_new: "🧾",
   request_new: "📝",
   request_decided: "⚖️",
+  expense_decided: "💰",
   info: "🔔",
 };
 

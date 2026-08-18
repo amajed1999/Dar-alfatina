@@ -12,7 +12,7 @@ export default async function ExpensesPage() {
     supabase
       .from("expenses")
       .select(
-        "id, expense_number, category_id, amount, expense_date, description, payment_method, notes, expense_categories(name)",
+        "id, expense_number, category_id, amount, expense_date, description, payment_method, notes, approval_status, decision_note, expense_categories(name)",
       )
       .is("deleted_at", null)
       .order("expense_date", { ascending: false })
@@ -30,6 +30,8 @@ export default async function ExpensesPage() {
     description: e.description,
     payment_method: e.payment_method,
     notes: e.notes,
+    approval_status: e.approval_status,
+    decision_note: e.decision_note,
   }));
 
   return (
@@ -37,6 +39,7 @@ export default async function ExpensesPage() {
       expenses={rows}
       categories={categories ?? []}
       canCreate={ctx.permissions.has(PERMISSIONS.expenses.create)}
+      canApprove={ctx.permissions.has(PERMISSIONS.expenses.approve)}
     />
   );
 }

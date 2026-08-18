@@ -91,6 +91,27 @@ export async function deleteExpense(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/** اعتماد/رفض مصروف معلّق (يتطلب صلاحية expenses.approve). */
+export async function decideExpense(
+  id: string,
+  approve: boolean,
+  note: string | null,
+): Promise<ActionResult> {
+  const ctx = await ctxWith(PERMISSIONS.expenses.approve);
+  if (!ctx) return { ok: false, error: "غير مصرح لك باعتماد المصاريف." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decide_expense", {
+    p_id: id,
+    p_approve: approve,
+    p_note: note,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/expenses");
+  revalidatePath("/reports/profit");
+  return { ok: true };
+}
+
 export async function createExpenseCategory(name: string): Promise<ActionResult> {
   const ctx = await ctxWith(PERMISSIONS.expenses.create);
   if (!ctx) return { ok: false, error: "غير مصرح لك." };

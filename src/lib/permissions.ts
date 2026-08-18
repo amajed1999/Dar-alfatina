@@ -40,6 +40,7 @@ export const PERMISSIONS = {
     invoiceApprove: "sales.invoice.approve",
     invoiceOversell: "sales.invoice.oversell",
     returnCreate: "sales.return.create",
+    discountApprove: "sales.discount.approve",
   },
   orders: {
     view: "orders.view",
@@ -58,6 +59,7 @@ export const PERMISSIONS = {
   expenses: {
     view: "expenses.view",
     create: "expenses.create",
+    approve: "expenses.approve",
   },
   tasks: {
     view: "tasks.view",
