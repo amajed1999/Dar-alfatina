@@ -58,6 +58,13 @@ export default function OrdersClient({
 
   function setStatus(o: OrderRow, to: string) {
     if (to === "cancelled" && !confirm(`إلغاء الطلب ${o.order_number ?? ""}؟`)) return;
+    if (
+      to === "delivered" &&
+      !confirm(
+        `تعيين «تم التسليم» سيُنشئ فاتورة بيع معتمدة من الطلب ${o.order_number ?? ""} ويخصم الكميات من المخزون ويسجّل الذمة. متابعة؟`,
+      )
+    )
+      return;
     setError(null);
     startTransition(async () => {
       const res = await updateOrderStatus(o.id, to);
