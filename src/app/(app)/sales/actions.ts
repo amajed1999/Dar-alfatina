@@ -86,7 +86,8 @@ export async function saveSalesDraft(
     .insert({
       merchant_id: header.merchant_id,
       warehouse_id: header.warehouse_id,
-      rep_id: ctx.userId,
+      // المندوب يُسنَد تلقائياً لمندوب التاجر المُسنَد (وإلا المُنشئ) عبر تريغر attribute_invoice_rep
+      rep_id: null,
       invoice_date: header.invoice_date,
       sale_type: header.sale_type,
       currency: header.currency,
