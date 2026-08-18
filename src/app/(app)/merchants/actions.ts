@@ -165,3 +165,25 @@ export async function unlinkPortal(merchantId: string): Promise<ActionResult> {
   revalidatePath("/merchants");
   return { ok: true };
 }
+
+/** إنشاء حساب بوابة جديد لتاجر (إيميل+كلمة مرور) وربطه دفعة واحدة. للمدير فقط. */
+export async function createMerchantUser(
+  merchantId: string,
+  email: string,
+  password: string,
+): Promise<ActionResult> {
+  const ctx = await ctxWith(PERMISSIONS.merchants.edit);
+  if (!ctx) return { ok: false, error: "غير مصرح لك." };
+  if (!email.trim()) return { ok: false, error: "البريد مطلوب." };
+  if (password.length < 8) return { ok: false, error: "كلمة المرور 8 أحرف على الأقل." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_create_merchant_user", {
+    p_merchant_id: merchantId,
+    p_email: email.trim(),
+    p_password: password,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/merchants");
+  return { ok: true };
+}

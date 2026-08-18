@@ -12,6 +12,7 @@ import {
   logVisit,
   linkPortal,
   unlinkPortal,
+  createMerchantUser,
   type MerchantPayload,
   type VisitInput,
 } from "@/app/(app)/merchants/actions";
@@ -153,11 +154,31 @@ export default function MerchantsClient({
   const [portalFor, setPortalFor] = useState<MerchantRow | null>(null);
   const [portalEmail, setPortalEmail] = useState("");
   const [portalErr, setPortalErr] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newErr, setNewErr] = useState<string | null>(null);
 
   function openPortal(m: MerchantRow) {
     setPortalFor(m);
     setPortalEmail("");
+    setNewEmail("");
+    setNewPassword("");
     setPortalErr(null);
+    setNewErr(null);
+  }
+  function submitCreatePortalAccount(e: React.FormEvent) {
+    e.preventDefault();
+    if (!portalFor) return;
+    setNewErr(null);
+    startTransition(async () => {
+      const res = await createMerchantUser(portalFor.id, newEmail, newPassword);
+      if (!res.ok) {
+        setNewErr(res.error ?? "تعذّر إنشاء الحساب");
+        return;
+      }
+      setPortalFor(null);
+      router.refresh();
+    });
   }
   function submitPortalLink(e: React.FormEvent) {
     e.preventDefault();
@@ -629,36 +650,19 @@ export default function MerchantsClient({
       >
         <div className="space-y-4">
           <p className="text-sm text-muted leading-relaxed">
-            تتيح البوابة للتاجر تسجيل الدخول لرؤية رصيده وفواتيره وكشف حسابه (قراءة فقط).
-            يجب أن ينشئ التاجر حساباً من صفحة التسجيل أولاً، ثم تربط بريده هنا.
+            تتيح البوابة للتاجر تسجيل الدخول لرؤية رصيده وفواتيره وكشف حسابه (قراءة فقط)
+            وتقديم الطلبات. أنشئ له حساباً هنا (بريد وكلمة مرور) وسلّمهما له.
           </p>
+
           {portalFor?.has_portal ? (
-            <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
-              ✓ هذا التاجر مرتبط بحساب بوابة حالياً.
-            </div>
-          ) : (
-            <div className="bg-background rounded-lg px-3 py-2 text-sm text-muted">لا حساب بوابة مرتبط بعد.</div>
-          )}
-          <form onSubmit={submitPortalLink} className="space-y-3">
-            <Field label="بريد حساب التاجر">
-              <input
-                type="email"
-                value={portalEmail}
-                onChange={(e) => setPortalEmail(e.target.value)}
-                dir="ltr"
-                placeholder="merchant@example.com"
-                className={inputCls}
-              />
-            </Field>
-            {portalErr && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{portalErr}</p>}
-            <div className="flex gap-3 pt-1 flex-wrap">
-              <button
-                disabled={pending}
-                className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg py-2.5 px-6 text-sm font-medium transition disabled:opacity-60"
-              >
-                {pending ? "جارٍ…" : "ربط الحساب"}
-              </button>
-              {portalFor?.has_portal && (
+            <>
+              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
+                ✓ هذا التاجر مرتبط بحساب بوابة حالياً.
+              </div>
+              {portalErr && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{portalErr}</p>
+              )}
+              <div className="flex gap-3 pt-1 flex-wrap">
                 <button
                   type="button"
                   onClick={doUnlinkPortal}
@@ -667,16 +671,91 @@ export default function MerchantsClient({
                 >
                   فكّ الربط
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setPortalFor(null)}
-                className="border border-border rounded-lg py-2.5 px-6 text-sm hover:bg-background transition"
-              >
-                إغلاق
-              </button>
-            </div>
-          </form>
+                <button
+                  type="button"
+                  onClick={() => setPortalFor(null)}
+                  className="border border-border rounded-lg py-2.5 px-6 text-sm hover:bg-background transition"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* إنشاء حساب جديد للتاجر */}
+              <form onSubmit={submitCreatePortalAccount} className="space-y-3">
+                <Field label="بريد التاجر">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    required
+                    dir="ltr"
+                    placeholder="merchant@example.com"
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="كلمة المرور (8 أحرف على الأقل)">
+                  <input
+                    type="text"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    dir="ltr"
+                    className={inputCls}
+                  />
+                </Field>
+                {newErr && (
+                  <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{newErr}</p>
+                )}
+                <button
+                  disabled={pending}
+                  className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg py-2.5 px-6 text-sm font-medium transition disabled:opacity-60"
+                >
+                  {pending ? "جارٍ…" : "إنشاء حساب التاجر"}
+                </button>
+              </form>
+
+              {/* بديل: ربط حساب موجود مسبقاً بالبريد */}
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted">
+                  أو اربط بريد حساب موجود مسبقاً
+                </summary>
+                <form onSubmit={submitPortalLink} className="space-y-3 mt-3">
+                  <Field label="بريد حساب موجود">
+                    <input
+                      type="email"
+                      value={portalEmail}
+                      onChange={(e) => setPortalEmail(e.target.value)}
+                      dir="ltr"
+                      placeholder="merchant@example.com"
+                      className={inputCls}
+                    />
+                  </Field>
+                  {portalErr && (
+                    <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{portalErr}</p>
+                  )}
+                  <button
+                    disabled={pending}
+                    className="border border-border rounded-lg py-2.5 px-6 text-sm hover:bg-background transition disabled:opacity-60"
+                  >
+                    {pending ? "جارٍ…" : "ربط الحساب"}
+                  </button>
+                </form>
+              </details>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setPortalFor(null)}
+                  className="border border-border rounded-lg py-2.5 px-6 text-sm hover:bg-background transition"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>

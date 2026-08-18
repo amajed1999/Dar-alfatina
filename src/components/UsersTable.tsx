@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setUserRole, setUserActive } from "@/app/(app)/users/actions";
+import { useRouter } from "next/navigation";
+import {
+  setUserRole,
+  setUserActive,
+  createStaffUser,
+} from "@/app/(app)/users/actions";
 
 type UserRow = {
   id: string;
@@ -25,8 +30,40 @@ export default function UsersTable({
   users: UserRow[];
   roles: Role[];
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // نموذج إضافة موظف
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    role_id: "",
+  });
+  const [addErr, setAddErr] = useState<string | null>(null);
+  const [addMsg, setAddMsg] = useState<string | null>(null);
+
+  function onAddSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setAddErr(null);
+    setAddMsg(null);
+    if (!form.role_id) {
+      setAddErr("اختر دور الموظف.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await createStaffUser(form);
+      if (!res.ok) {
+        setAddErr(res.error ?? "تعذّر إنشاء الحساب");
+        return;
+      }
+      setAddMsg(`تم إنشاء حساب ${form.full_name} بنجاح.`);
+      setForm({ full_name: "", email: "", password: "", role_id: "" });
+      router.refresh();
+    });
+  }
 
   function onRoleChange(userId: string, roleId: string) {
     setError(null);
@@ -46,6 +83,101 @@ export default function UsersTable({
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <button
+          onClick={() => {
+            setShowAdd((s) => !s);
+            setAddErr(null);
+            setAddMsg(null);
+          }}
+          className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg px-4 py-2 text-sm font-medium transition"
+        >
+          {showAdd ? "إغلاق" : "➕ إضافة موظف"}
+        </button>
+      </div>
+
+      {showAdd && (
+        <form
+          onSubmit={onAddSubmit}
+          className="bg-card border border-border rounded-xl p-4 grid gap-3 sm:grid-cols-2"
+        >
+          <div className="sm:col-span-2">
+            <p className="text-sm font-medium">إنشاء حساب موظف جديد</p>
+            <p className="text-xs text-muted mt-0.5">
+              يُنشأ الحساب مفعّلاً فوراً بالدور المحدّد. سلّم الموظف بريده وكلمة المرور
+              ليدخل من صفحة الدخول.
+            </p>
+          </div>
+          <label className="text-sm">
+            <span className="text-muted">الاسم الكامل</span>
+            <input
+              value={form.full_name}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              required
+              className="mt-1 w-full border border-border rounded-lg px-3 py-2 bg-card outline-none focus:border-primary"
+            />
+          </label>
+          <label className="text-sm">
+            <span className="text-muted">الدور</span>
+            <select
+              value={form.role_id}
+              onChange={(e) => setForm({ ...form, role_id: e.target.value })}
+              required
+              className="mt-1 w-full border border-border rounded-lg px-3 py-2 bg-card outline-none focus:border-primary"
+            >
+              <option value="">— اختر الدور —</option>
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name_ar}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="text-muted">البريد الإلكتروني</span>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+              dir="ltr"
+              placeholder="employee@example.com"
+              className="mt-1 w-full border border-border rounded-lg px-3 py-2 bg-card outline-none focus:border-primary"
+            />
+          </label>
+          <label className="text-sm">
+            <span className="text-muted">كلمة المرور (8 أحرف على الأقل)</span>
+            <input
+              type="text"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+              minLength={8}
+              dir="ltr"
+              className="mt-1 w-full border border-border rounded-lg px-3 py-2 bg-card outline-none focus:border-primary"
+            />
+          </label>
+          {addErr && (
+            <p className="sm:col-span-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              {addErr}
+            </p>
+          )}
+          {addMsg && (
+            <p className="sm:col-span-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
+              {addMsg}
+            </p>
+          )}
+          <div className="sm:col-span-2">
+            <button
+              disabled={pending}
+              className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg px-6 py-2.5 text-sm font-medium transition disabled:opacity-60"
+            >
+              {pending ? "جارٍ الإنشاء…" : "إنشاء الحساب"}
+            </button>
+          </div>
+        </form>
+      )}
+
       {error && (
         <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
           {error}

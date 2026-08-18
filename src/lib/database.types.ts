@@ -2049,6 +2049,19 @@ export type Database = {
         Args: { p_merchant: string; p_email: string }
         Returns: undefined
       }
+      admin_create_staff_user: {
+        Args: {
+          p_email: string
+          p_password: string
+          p_full_name: string
+          p_role_id: string
+        }
+        Returns: string
+      }
+      admin_create_merchant_user: {
+        Args: { p_merchant_id: string; p_email: string; p_password: string }
+        Returns: string
+      }
       unlink_merchant_portal: {
         Args: { p_merchant: string }
         Returns: undefined

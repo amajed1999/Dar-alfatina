@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -79,10 +78,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-sm text-muted mt-6">
-          أول مرة تستخدم النظام؟{" "}
-          <Link href="/signup" className="text-primary font-medium">
-            إنشاء حساب المدير
-          </Link>
+          الحسابات يُنشئها مدير النظام. راجعه إن لم يكن لديك حساب.
         </p>
       </div>
     </div>
