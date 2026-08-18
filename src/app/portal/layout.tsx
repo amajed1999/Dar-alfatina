@@ -21,8 +21,10 @@ export default async function PortalLayout({
             <p className="text-xs text-muted">بوابة التاجر</p>
           </div>
           <div className="flex items-center gap-2">
-            <nav className="flex gap-1 text-sm">
+            <nav className="flex gap-1 text-sm flex-wrap">
               <Link href="/portal" className="px-3 py-1.5 rounded-lg hover:bg-background transition">الرئيسية</Link>
+              <Link href="/portal/products" className="px-3 py-1.5 rounded-lg hover:bg-background transition">اطلب بضاعة</Link>
+              <Link href="/portal/orders" className="px-3 py-1.5 rounded-lg hover:bg-background transition">طلباتي</Link>
               <Link href="/portal/invoices" className="px-3 py-1.5 rounded-lg hover:bg-background transition">فواتيري</Link>
               <Link href="/portal/statement" className="px-3 py-1.5 rounded-lg hover:bg-background transition">كشف الحساب</Link>
             </nav>

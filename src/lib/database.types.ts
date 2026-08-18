@@ -267,6 +267,122 @@ export type Database = {
           },
         ]
       }
+      merchant_order_items: {
+        Row: {
+          id: string
+          line_total: number | null
+          metadata: Json
+          order_id: string
+          product_id: string
+          quantity: number
+          unit_price: number
+        }
+        Insert: {
+          id?: string
+          line_total?: number | null
+          metadata?: Json
+          order_id: string
+          product_id: string
+          quantity: number
+          unit_price?: number
+        }
+        Update: {
+          id?: string
+          line_total?: number | null
+          metadata?: Json
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merchant_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_orders: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          created_by: string | null
+          delivered_at: string | null
+          deleted_at: string | null
+          id: string
+          merchant_id: string
+          metadata: Json
+          notes: string | null
+          order_date: string
+          order_number: string | null
+          price_tier_id: string | null
+          shipped_at: string | null
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+          warehouse_id: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          merchant_id: string
+          metadata?: Json
+          notes?: string | null
+          order_date?: string
+          order_number?: string | null
+          price_tier_id?: string | null
+          shipped_at?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          merchant_id?: string
+          metadata?: Json
+          notes?: string | null
+          order_date?: string
+          order_number?: string | null
+          price_tier_id?: string | null
+          shipped_at?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_orders_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchant_users: {
         Row: {
           created_at: string
@@ -1888,6 +2004,46 @@ export type Database = {
           remaining: number
           status: string
         }[]
+      }
+      portal_products: {
+        Args: Record<string, never>
+        Returns: {
+          product_id: string
+          name: string
+          sku: string
+          category_name: string
+          base_unit_name: string
+          price: number
+          stock_qty: number
+        }[]
+      }
+      portal_place_order: {
+        Args: { p_items: Json; p_notes?: string }
+        Returns: string
+      }
+      portal_my_orders: {
+        Args: Record<string, never>
+        Returns: {
+          order_id: string
+          order_number: string
+          order_date: string
+          status: string
+          total: number
+          notes: string
+          item_id: string
+          product_name: string
+          quantity: number
+          unit_price: number
+          line_total: number
+        }[]
+      }
+      update_order_status: {
+        Args: { p_order: string; p_status: string }
+        Returns: undefined
+      }
+      create_invoice_from_order: {
+        Args: { p_order: string }
+        Returns: string
       }
       link_merchant_portal: {
         Args: { p_merchant: string; p_email: string }
