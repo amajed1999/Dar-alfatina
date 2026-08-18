@@ -21,6 +21,8 @@ const ICON: Record<string, string> = {
   task_done: "✅",
   task_comment: "💬",
   order_new: "🧾",
+  request_new: "📝",
+  request_decided: "⚖️",
   info: "🔔",
 };
 

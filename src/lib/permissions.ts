@@ -64,6 +64,8 @@ export const PERMISSIONS = {
     viewAll: "tasks.view_all",
     create: "tasks.create",
     assign: "tasks.assign",
+    requestCreate: "tasks.request.create",
+    requestApprove: "tasks.request.approve",
   },
   reports: {
     sales: "reports.sales",

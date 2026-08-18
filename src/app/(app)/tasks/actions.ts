@@ -63,6 +63,57 @@ export async function updateTask(id: string, input: TaskInput): Promise<ActionRe
   return { ok: true, id };
 }
 
+export type RequestInput = {
+  title: string;
+  description: string | null;
+  priority: "low" | "medium" | "high" | "urgent";
+  due_date: string | null;
+  related_type: "merchant" | "sales_invoice" | "product" | null;
+  related_id: string | null;
+  approver: string;
+};
+
+/** تقديم طلب موافقة إلى شخص محدّد. */
+export async function createRequest(input: RequestInput): Promise<ActionResult> {
+  const ctx = await ctxWith(PERMISSIONS.tasks.requestCreate);
+  if (!ctx) return { ok: false, error: "غير مصرح لك بتقديم الطلبات." };
+  if (!input.title.trim()) return { ok: false, error: "عنوان الطلب مطلوب." };
+  if (!input.approver) return { ok: false, error: "حدّد الشخص المسؤول عن الموافقة." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_request", {
+    p_title: input.title.trim(),
+    p_description: input.description,
+    p_priority: input.priority,
+    p_due_date: input.due_date,
+    p_related_type: input.related_type,
+    p_related_id: input.related_id,
+    p_approver: input.approver,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/tasks");
+  return { ok: true, id: data as string };
+}
+
+/** موافقة/رفض طلب (المسؤول المحدّد فقط + صلاحية). */
+export async function decideRequest(
+  id: string,
+  approve: boolean,
+  note: string | null,
+): Promise<ActionResult> {
+  const ctx = await getSessionContext();
+  if (!ctx) return { ok: false, error: "غير مصرح." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decide_request", {
+    p_task_id: id,
+    p_approve: approve,
+    p_note: note,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/tasks");
+  return { ok: true };
+}
+
 export async function changeStatus(id: string, status: string): Promise<ActionResult> {
   const ctx = await getSessionContext();
   if (!ctx) return { ok: false, error: "غير مصرح." };

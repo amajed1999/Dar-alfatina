@@ -13,7 +13,7 @@ export default async function TasksPage() {
       supabase
         .from("tasks")
         .select(
-          "id, title, description, priority, due_date, status, related_type, related_id, created_by, created_at, task_assignees(user_id, user_profiles(full_name)), task_comments(id, body, created_at, user_id, user_profiles(full_name)), task_attachments(id, storage_path, file_name, file_size, created_at)",
+          "id, title, description, priority, due_date, status, item_type, approval_status, approver_id, decision_note, related_type, related_id, created_by, created_at, task_assignees(user_id, user_profiles(full_name)), task_comments(id, body, created_at, user_id, user_profiles(full_name)), task_attachments(id, storage_path, file_name, file_size, created_at)",
         )
         .is("deleted_at", null)
         .order("created_at", { ascending: false }),
@@ -57,6 +57,11 @@ export default async function TasksPage() {
     priority: t.priority,
     due_date: t.due_date,
     status: t.status,
+    item_type: t.item_type,
+    approval_status: t.approval_status,
+    approver_id: t.approver_id,
+    approver_name: t.approver_id ? (userMap[t.approver_id] ?? null) : null,
+    decision_note: t.decision_note,
     related_type: t.related_type,
     related_id: t.related_id,
     related_label: relatedLabel(t.related_type, t.related_id),
@@ -96,6 +101,8 @@ export default async function TasksPage() {
       canCreate={ctx.permissions.has(PERMISSIONS.tasks.create)}
       canAssign={ctx.permissions.has(PERMISSIONS.tasks.assign)}
       canViewAll={ctx.permissions.has(PERMISSIONS.tasks.viewAll)}
+      canRequest={ctx.permissions.has(PERMISSIONS.tasks.requestCreate)}
+      canApprove={ctx.permissions.has(PERMISSIONS.tasks.requestApprove)}
     />
   );
 }

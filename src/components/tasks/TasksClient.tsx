@@ -7,6 +7,8 @@ import { fmtDate, fmtDateTime } from "@/lib/format";
 import {
   createTask,
   updateTask,
+  createRequest,
+  decideRequest,
   changeStatus,
   addComment,
   removeTask,
@@ -33,6 +35,11 @@ export type TaskRow = {
   priority: string;
   due_date: string | null;
   status: string;
+  item_type: string;
+  approval_status: string | null;
+  approver_id: string | null;
+  approver_name: string | null;
+  decision_note: string | null;
   related_type: string | null;
   related_id: string | null;
   related_label: string | null;
@@ -53,6 +60,8 @@ type Props = {
   canCreate: boolean;
   canAssign: boolean;
   canViewAll: boolean;
+  canRequest: boolean;
+  canApprove: boolean;
 };
 
 const PRIORITY: Record<string, { label: string; cls: string }> = {
@@ -67,6 +76,11 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   done: { label: "منجزة", cls: "bg-green-50 text-green-700" },
   rejected: { label: "مرفوضة", cls: "bg-red-50 text-red-700" },
   deferred: { label: "مؤجلة", cls: "bg-border text-muted" },
+};
+const APPROVAL: Record<string, { label: string; cls: string }> = {
+  pending: { label: "قيد الموافقة", cls: "bg-amber-50 text-amber-700" },
+  approved: { label: "تمت الموافقة", cls: "bg-green-50 text-green-700" },
+  rejected: { label: "مرفوض", cls: "bg-red-50 text-red-700" },
 };
 const BOARD_COLUMNS: { key: string; label: string; cls: string }[] = [
   { key: "new", label: "جديدة", cls: "bg-blue-50 text-blue-700" },
@@ -86,17 +100,19 @@ type FormState = {
   related_type: "" | "merchant" | "sales_invoice" | "product";
   related_id: string;
   assignees: string[];
+  approver: string;
 };
 
 export default function TasksClient({
   tasks, users, merchants, products, invoices,
-  currentUserId, canCreate, canAssign, canViewAll,
+  currentUserId, canCreate, canAssign, canViewAll, canRequest, canApprove,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [rowError, setRowError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "mine" | "created">("all");
+  const [filter, setFilter] = useState<"all" | "mine" | "created" | "await">("all");
+  const [mode, setMode] = useState<"task" | "request">("task");
   const [commentText, setCommentText] = useState<Record<string, string>>({});
   const [view, setView] = useState<"list" | "board">("list");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
@@ -111,7 +127,7 @@ export default function TasksClient({
   function emptyForm(self: string): FormState {
     return {
       title: "", description: "", priority: "medium", due_date: "",
-      related_type: "", related_id: "", assignees: [self],
+      related_type: "", related_id: "", assignees: [self], approver: "",
     };
   }
 
@@ -119,15 +135,31 @@ export default function TasksClient({
     type === "merchant" ? merchants : type === "product" ? products : type === "sales_invoice" ? invoices : [];
 
   const filtered = useMemo(() => {
-    if (filter === "mine") return tasks.filter((t) => t.assignees.some((a) => a.user_id === currentUserId));
+    if (filter === "mine")
+      return tasks.filter(
+        (t) => t.assignees.some((a) => a.user_id === currentUserId) || t.approver_id === currentUserId,
+      );
     if (filter === "created") return tasks.filter((t) => t.created_by === currentUserId);
+    if (filter === "await")
+      return tasks.filter(
+        (t) => t.item_type === "request" && t.approval_status === "pending" && t.approver_id === currentUserId,
+      );
     return tasks;
   }, [tasks, filter, currentUserId]);
 
+  const awaitingCount = useMemo(
+    () =>
+      tasks.filter(
+        (t) => t.item_type === "request" && t.approval_status === "pending" && t.approver_id === currentUserId,
+      ).length,
+    [tasks, currentUserId],
+  );
+
   const summary = useMemo(() => {
-    const s = { total: tasks.length, open: 0, overdue: 0, done: 0 };
+    const onlyTasks = tasks.filter((t) => t.item_type !== "request");
+    const s = { total: onlyTasks.length, open: 0, overdue: 0, done: 0 };
     const td = today();
-    for (const t of tasks) {
+    for (const t of onlyTasks) {
       if (t.status === "done") s.done++;
       else if (t.status === "rejected") {
         // مرفوضة = مغلقة، لا تُحسب ضمن المفتوحة
@@ -141,12 +173,21 @@ export default function TasksClient({
 
   function openNew() {
     setEditingId(null);
+    setMode("task");
+    setForm(emptyForm(currentUserId));
+    setError(null);
+    setOpen(true);
+  }
+  function openNewRequest() {
+    setEditingId(null);
+    setMode("request");
     setForm(emptyForm(currentUserId));
     setError(null);
     setOpen(true);
   }
   function openEdit(t: TaskRow) {
     setEditingId(t.id);
+    setMode("task");
     setError(null);
     setForm({
       title: t.title,
@@ -156,6 +197,7 @@ export default function TasksClient({
       related_type: (t.related_type ?? "") as FormState["related_type"],
       related_id: t.related_id ?? "",
       assignees: t.assignees.map((a) => a.user_id),
+      approver: "",
     });
     setOpen(true);
   }
@@ -172,24 +214,52 @@ export default function TasksClient({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!form.title.trim()) return setError("عنوان المهمة مطلوب.");
-    const input: TaskInput = {
-      title: form.title,
-      description: form.description.trim() || null,
-      priority: form.priority,
-      due_date: form.due_date || null,
-      related_type: form.related_type || null,
-      related_id: form.related_type ? form.related_id || null : null,
-      assignees: form.assignees.length ? form.assignees : [currentUserId],
-    };
+    if (!form.title.trim()) return setError(mode === "request" ? "عنوان الطلب مطلوب." : "عنوان المهمة مطلوب.");
+    if (mode === "request" && !form.approver) return setError("حدّد الشخص المسؤول عن الموافقة.");
+
     startTransition(async () => {
-      const res = editingId ? await updateTask(editingId, input) : await createTask(input);
+      let res;
+      if (mode === "request") {
+        res = await createRequest({
+          title: form.title,
+          description: form.description.trim() || null,
+          priority: form.priority,
+          due_date: form.due_date || null,
+          related_type: form.related_type || null,
+          related_id: form.related_type ? form.related_id || null : null,
+          approver: form.approver,
+        });
+      } else {
+        const input: TaskInput = {
+          title: form.title,
+          description: form.description.trim() || null,
+          priority: form.priority,
+          due_date: form.due_date || null,
+          related_type: form.related_type || null,
+          related_id: form.related_type ? form.related_id || null : null,
+          assignees: form.assignees.length ? form.assignees : [currentUserId],
+        };
+        res = editingId ? await updateTask(editingId, input) : await createTask(input);
+      }
       if (!res.ok) {
         setError(res.error ?? "حدث خطأ");
         return;
       }
       setOpen(false);
       router.refresh();
+    });
+  }
+
+  function decide(t: TaskRow, approve: boolean) {
+    setRowError(null);
+    let note: string | null = null;
+    if (!approve) {
+      note = window.prompt("سبب الرفض (اختياري):") ?? null;
+    }
+    startTransition(async () => {
+      const res = await decideRequest(t.id, approve, note);
+      if (!res.ok) setRowError(res.error ?? "تعذّر تنفيذ القرار");
+      else router.refresh();
     });
   }
 
@@ -296,11 +366,18 @@ export default function TasksClient({
           <h1 className="text-2xl font-bold">المهام</h1>
           <p className="text-muted mt-1 text-sm">إسناد المهام ومتابعتها، مع ربطها بالتجار والفواتير والمنتجات.</p>
         </div>
-        {canCreate && (
-          <button onClick={openNew} className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg py-2.5 px-5 text-sm font-medium transition">
-            + مهمة
-          </button>
-        )}
+        <div className="flex gap-2">
+          {canRequest && (
+            <button onClick={openNewRequest} className="border border-primary text-primary hover:bg-primary/5 rounded-lg py-2.5 px-5 text-sm font-medium transition">
+              + طلب موافقة
+            </button>
+          )}
+          {canCreate && (
+            <button onClick={openNew} className="bg-primary hover:bg-[var(--primary-hover)] text-white rounded-lg py-2.5 px-5 text-sm font-medium transition">
+              + مهمة
+            </button>
+          )}
+        </div>
       </div>
 
       {canViewAll && (
@@ -320,11 +397,12 @@ export default function TasksClient({
       )}
 
       <div className="flex items-end justify-between gap-3 border-b border-border flex-wrap">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {([
             ["all", "الكل"],
             ["mine", "مهامي"],
             ["created", "أنشأتها"],
+            ["await", "بانتظار موافقتي"],
           ] as const).map(([k, label]) => (
             <button
               key={k}
@@ -334,6 +412,11 @@ export default function TasksClient({
               }`}
             >
               {label}
+              {k === "await" && awaitingCount > 0 && (
+                <span className="mr-1.5 text-[11px] bg-amber-100 text-amber-800 rounded-full px-1.5 py-0.5 tabular">
+                  {awaitingCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -361,7 +444,9 @@ export default function TasksClient({
         <div className="overflow-x-auto pb-2">
           <div className="flex gap-3 min-w-max">
             {BOARD_COLUMNS.map((col) => {
-              const cards = filtered.filter((t) => (statusOverrides[t.id] ?? t.status) === col.key);
+              const cards = filtered.filter(
+                (t) => t.item_type !== "request" && (statusOverrides[t.id] ?? t.status) === col.key,
+              );
               return (
                 <div
                   key={col.key}
@@ -430,9 +515,16 @@ export default function TasksClient({
         {filtered.map((t) => {
           const pr = PRIORITY[t.priority] ?? PRIORITY.medium;
           const st = STATUS[t.status] ?? STATUS.new;
+          const isRequest = t.item_type === "request";
+          const appr = APPROVAL[t.approval_status ?? "pending"] ?? APPROVAL.pending;
+          const canDecide =
+            isRequest && t.approval_status === "pending" && canApprove && t.approver_id === currentUserId;
           const overdue = t.due_date && t.due_date < today() && t.status !== "done" && t.status !== "rejected";
           const isOpen = expanded === t.id;
-          const canEdit = canCreate && (t.created_by === currentUserId || canViewAll);
+          const canEdit = !isRequest && canCreate && (t.created_by === currentUserId || canViewAll);
+          const canDeleteRow = isRequest
+            ? t.created_by === currentUserId || canViewAll
+            : canEdit;
           return (
             <div key={t.id} className="bg-card border border-border rounded-xl overflow-hidden">
               <div className="p-4">
@@ -442,8 +534,15 @@ export default function TasksClient({
                       <button onClick={() => setExpanded(isOpen ? null : t.id)} className="font-semibold hover:text-primary transition text-right">
                         {t.title}
                       </button>
+                      {isRequest && (
+                        <span className="text-[11px] rounded-full px-2 py-0.5 bg-primary/10 text-primary">طلب</span>
+                      )}
                       <span className={`text-[11px] rounded-full px-2 py-0.5 ${pr.cls}`}>{pr.label}</span>
-                      <span className={`text-[11px] rounded-full px-2 py-0.5 ${st.cls}`}>{st.label}</span>
+                      {isRequest ? (
+                        <span className={`text-[11px] rounded-full px-2 py-0.5 ${appr.cls}`}>{appr.label}</span>
+                      ) : (
+                        <span className={`text-[11px] rounded-full px-2 py-0.5 ${st.cls}`}>{st.label}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-muted flex-wrap">
                       {t.due_date && (
@@ -451,7 +550,10 @@ export default function TasksClient({
                           الاستحقاق: {fmtDate(t.due_date)}{overdue ? " (متأخرة)" : ""}
                         </span>
                       )}
-                      {t.assignees.length > 0 && <span>المكلَّفون: {t.assignees.map((a) => a.name).join("، ")}</span>}
+                      {isRequest && t.approver_name && <span>المسؤول: {t.approver_name}</span>}
+                      {!isRequest && t.assignees.length > 0 && (
+                        <span>المكلَّفون: {t.assignees.map((a) => a.name).join("، ")}</span>
+                      )}
                       {t.related_type && t.related_label && (
                         <span className="bg-background rounded px-2 py-0.5">
                           {REL_LABEL[t.related_type]}: {t.related_label}
@@ -470,24 +572,47 @@ export default function TasksClient({
                 <div className="border-t border-border p-4 space-y-4 bg-background/40">
                   {t.description && <p className="text-sm whitespace-pre-wrap">{t.description}</p>}
 
+                  {isRequest && t.decision_note && (
+                    <p className="text-sm bg-background border border-border rounded-lg px-3 py-2">
+                      <span className="text-muted">ملاحظة القرار: </span>
+                      {t.decision_note}
+                    </p>
+                  )}
+
                   <div className="flex gap-2 flex-wrap">
-                    {t.status !== "in_progress" && t.status !== "done" && (
-                      <button disabled={pending} onClick={() => setStatus(t, "in_progress")} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">بدء التنفيذ</button>
-                    )}
-                    {t.status !== "done" && (
-                      <button disabled={pending} onClick={() => setStatus(t, "done")} className="text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-1.5 transition disabled:opacity-40">إنجاز</button>
-                    )}
-                    {t.status !== "deferred" && t.status !== "done" && (
-                      <button disabled={pending} onClick={() => setStatus(t, "deferred")} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">تأجيل</button>
-                    )}
-                    {t.status !== "rejected" && t.status !== "done" && (
-                      <button disabled={pending} onClick={() => setStatus(t, "rejected")} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">رفض</button>
-                    )}
-                    {canEdit && (
+                    {isRequest ? (
                       <>
-                        <button onClick={() => openEdit(t)} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition">تعديل</button>
-                        <button disabled={pending} onClick={() => doDelete(t)} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">حذف</button>
+                        {canDecide && (
+                          <>
+                            <button disabled={pending} onClick={() => decide(t, true)} className="text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-1.5 transition disabled:opacity-40">موافقة</button>
+                            <button disabled={pending} onClick={() => decide(t, false)} className="text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg px-4 py-1.5 transition disabled:opacity-40">رفض</button>
+                          </>
+                        )}
+                        {!canDecide && t.approval_status === "pending" && (
+                          <span className="text-sm text-muted">بانتظار قرار {t.approver_name ?? "المسؤول"}.</span>
+                        )}
                       </>
+                    ) : (
+                      <>
+                        {t.status !== "in_progress" && t.status !== "done" && (
+                          <button disabled={pending} onClick={() => setStatus(t, "in_progress")} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">بدء التنفيذ</button>
+                        )}
+                        {t.status !== "done" && (
+                          <button disabled={pending} onClick={() => setStatus(t, "done")} className="text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-1.5 transition disabled:opacity-40">إنجاز</button>
+                        )}
+                        {t.status !== "deferred" && t.status !== "done" && (
+                          <button disabled={pending} onClick={() => setStatus(t, "deferred")} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">تأجيل</button>
+                        )}
+                        {t.status !== "rejected" && t.status !== "done" && (
+                          <button disabled={pending} onClick={() => setStatus(t, "rejected")} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">رفض</button>
+                        )}
+                        {canEdit && (
+                          <button onClick={() => openEdit(t)} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition">تعديل</button>
+                        )}
+                      </>
+                    )}
+                    {canDeleteRow && (
+                      <button disabled={pending} onClick={() => doDelete(t)} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-card transition disabled:opacity-40">حذف</button>
                     )}
                   </div>
 
@@ -556,7 +681,12 @@ export default function TasksClient({
       </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editingId ? "تعديل مهمة" : "مهمة جديدة"} wide>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={mode === "request" ? "طلب موافقة جديد" : editingId ? "تعديل مهمة" : "مهمة جديدة"}
+        wide
+      >
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm mb-1">العنوان *</label>
@@ -609,28 +739,49 @@ export default function TasksClient({
             )}
           </div>
 
-          <div>
-            <label className="block text-sm mb-1">
-              المكلَّفون {!canAssign && <span className="text-xs text-muted">(الإسناد لغيرك يتطلب صلاحية)</span>}
-            </label>
-            <div className="border border-border rounded-lg p-3 max-h-40 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {users.map((u) => {
-                const disabled = !canAssign && u.id !== currentUserId;
-                return (
-                  <label key={u.id} className={`flex items-center gap-2 text-sm ${disabled ? "opacity-40" : ""}`}>
-                    <input
-                      type="checkbox"
-                      disabled={disabled}
-                      checked={form.assignees.includes(u.id)}
-                      onChange={() => toggleAssignee(u.id)}
-                    />
-                    {u.label}
-                  </label>
-                );
-              })}
-              {users.length === 0 && <p className="text-sm text-muted">لا يوجد موظفون متاحون.</p>}
+          {mode === "request" ? (
+            <div>
+              <label className="block text-sm mb-1">المسؤول عن الموافقة *</label>
+              <select
+                value={form.approver}
+                onChange={(e) => setForm((f) => ({ ...f, approver: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="">— اختر الشخص —</option>
+                {users
+                  .filter((u) => u.id !== currentUserId)
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>{u.label}</option>
+                  ))}
+              </select>
+              <p className="text-xs text-muted mt-1">
+                يصل الطلب لهذا الشخص فقط ليوافق أو يرفض؛ لا يراه باقي الموظفين.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-sm mb-1">
+                المكلَّفون {!canAssign && <span className="text-xs text-muted">(الإسناد لغيرك يتطلب صلاحية)</span>}
+              </label>
+              <div className="border border-border rounded-lg p-3 max-h-40 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {users.map((u) => {
+                  const disabled = !canAssign && u.id !== currentUserId;
+                  return (
+                    <label key={u.id} className={`flex items-center gap-2 text-sm ${disabled ? "opacity-40" : ""}`}>
+                      <input
+                        type="checkbox"
+                        disabled={disabled}
+                        checked={form.assignees.includes(u.id)}
+                        onChange={() => toggleAssignee(u.id)}
+                      />
+                      {u.label}
+                    </label>
+                  );
+                })}
+                {users.length === 0 && <p className="text-sm text-muted">لا يوجد موظفون متاحون.</p>}
+              </div>
+            </div>
+          )}
 
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 

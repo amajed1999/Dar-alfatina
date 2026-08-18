@@ -1518,12 +1518,18 @@ export type Database = {
       }
       tasks: {
         Row: {
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
+          approver_id: string | null
           created_at: string
           created_by: string | null
+          decision_note: string | null
           deleted_at: string | null
           description: string | null
           due_date: string | null
           id: string
+          item_type: string
           metadata: Json
           priority: string
           related_id: string | null
@@ -1533,12 +1539,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          approver_id?: string | null
           created_at?: string
           created_by?: string | null
+          decision_note?: string | null
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
+          item_type?: string
           metadata?: Json
           priority?: string
           related_id?: string | null
@@ -1548,12 +1560,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          approver_id?: string | null
           created_at?: string
           created_by?: string | null
+          decision_note?: string | null
           deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
+          item_type?: string
           metadata?: Json
           priority?: string
           related_id?: string | null
@@ -1942,6 +1960,22 @@ export type Database = {
           p_assignees: string[]
         }
         Returns: string
+      }
+      create_request: {
+        Args: {
+          p_title: string
+          p_description: string | null
+          p_priority: string
+          p_due_date: string | null
+          p_related_type: string | null
+          p_related_id: string | null
+          p_approver: string
+        }
+        Returns: string
+      }
+      decide_request: {
+        Args: { p_task_id: string; p_approve: boolean; p_note: string | null }
+        Returns: undefined
       }
       update_task: {
         Args: {
