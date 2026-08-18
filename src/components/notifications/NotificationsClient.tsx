@@ -20,6 +20,7 @@ const ICON: Record<string, string> = {
   task_due: "⏰",
   task_done: "✅",
   task_comment: "💬",
+  order_new: "🧾",
   info: "🔔",
 };
 
