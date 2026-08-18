@@ -42,6 +42,7 @@ export const NAV: NavSection[] = [
       { href: "/sales", label: "فواتير البيع", permission: PERMISSIONS.sales.view },
       { href: "/payments", label: "التحصيلات", permission: PERMISSIONS.payments.view },
       { href: "/expenses", label: "المصاريف", permission: PERMISSIONS.expenses.view },
+      { href: "/targets", label: "أهداف المندوبين", permission: PERMISSIONS.sales.targetsView },
       { href: "/tasks", label: "المهام", permission: PERMISSIONS.tasks.view },
     ],
   },

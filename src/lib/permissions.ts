@@ -41,6 +41,8 @@ export const PERMISSIONS = {
     invoiceOversell: "sales.invoice.oversell",
     returnCreate: "sales.return.create",
     discountApprove: "sales.discount.approve",
+    targetsView: "targets.view",
+    targetsManage: "targets.manage",
   },
   orders: {
     view: "orders.view",

@@ -1395,6 +1395,39 @@ export type Database = {
           },
         ]
       }
+      sales_targets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          period_month: string
+          rep_id: string
+          target_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month: string
+          rep_id: string
+          target_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month?: string
+          rep_id?: string
+          target_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           description: string | null
@@ -2138,6 +2171,21 @@ export type Database = {
           merchants_count: number
           visits_count: number
         }[]
+      }
+      rep_targets: {
+        Args: { p_month?: string }
+        Returns: {
+          rep_id: string
+          rep_name: string
+          target_amount: number
+          achieved: number
+          pct: number | null
+          invoices_count: number
+        }[]
+      }
+      set_rep_target: {
+        Args: { p_rep: string; p_month: string; p_amount: number }
+        Returns: string
       }
       report_sales_by_merchant: {
         Args: { p_from?: string; p_to?: string }
