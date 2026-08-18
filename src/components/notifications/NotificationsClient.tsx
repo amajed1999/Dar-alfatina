@@ -24,6 +24,7 @@ const ICON: Record<string, string> = {
   request_new: "📝",
   request_decided: "⚖️",
   expense_decided: "💰",
+  debt_reminder: "🔴",
   info: "🔔",
 };
 
