@@ -2172,6 +2172,20 @@ export type Database = {
           visits_count: number
         }[]
       }
+      reorder_suggestions: {
+        Args: Record<string, never>
+        Returns: {
+          product_id: string
+          name: string
+          sku: string
+          current_stock: number
+          reorder_level: number
+          sold_90d: number
+          avg_daily: number
+          days_cover: number | null
+          suggested_qty: number
+        }[]
+      }
       rep_targets: {
         Args: { p_month?: string }
         Returns: {

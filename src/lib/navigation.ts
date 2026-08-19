@@ -52,6 +52,7 @@ export const NAV: NavSection[] = [
       { href: "/reports/sales", label: "المبيعات", permission: PERMISSIONS.reports.sales },
       { href: "/reports/aging", label: "أعمار الذمم", permission: PERMISSIONS.reports.aging },
       { href: "/reports/inventory", label: "المخزون وقيمته", permission: PERMISSIONS.reports.inventory },
+      { href: "/reports/reorder", label: "اقتراحات إعادة الطلب", permission: PERMISSIONS.inventory.view },
       { href: "/reports/item-movement", label: "حركة صنف", permission: PERMISSIONS.reports.inventory },
       { href: "/reports/profit", label: "الأرباح والخسائر", permission: PERMISSIONS.reports.profit },
       { href: "/reports/reps", label: "أداء المندوبين", permission: PERMISSIONS.reports.reps },
