@@ -44,6 +44,7 @@ export type Product = {
   name: string | null;
   sku: string | null;
   base_unit_name: string | null;
+  barcode?: string | null;
 };
 
 type Props = {
@@ -115,6 +116,8 @@ export default function PurchasesClient({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [scanValue, setScanValue] = useState("");
+  const [scanError, setScanError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
   const productName = (id: string) => {
@@ -172,6 +175,37 @@ export default function PurchasesClient({
   }
   function addRow() {
     setForm((f) => ({ ...f, items: [...f.items, emptyItem()] }));
+  }
+  function addByBarcode(code: string) {
+    const c = code.trim();
+    if (!c) return;
+    setScanError(null);
+    const prod =
+      products.find((p) => (p.barcode ?? "") === c) ?? products.find((p) => p.sku === c);
+    if (!prod || !prod.id) {
+      setScanError(`لا يوجد منتج بالباركود/الرمز «${c}»`);
+      setScanValue("");
+      return;
+    }
+    const pid = prod.id;
+    setForm((f) => {
+      const existingIdx = f.items.findIndex((it) => it.product_id === pid);
+      if (existingIdx >= 0) {
+        return {
+          ...f,
+          items: f.items.map((it, idx) =>
+            idx === existingIdx ? { ...it, quantity: String((Number(it.quantity) || 0) + 1) } : it,
+          ),
+        };
+      }
+      const newRow: ItemRow = { product_id: pid, quantity: "1", unit_cost: "", discount: "" };
+      const emptyIdx = f.items.findIndex((it) => !it.product_id);
+      if (emptyIdx >= 0) {
+        return { ...f, items: f.items.map((it, idx) => (idx === emptyIdx ? newRow : it)) };
+      }
+      return { ...f, items: [...f.items, newRow] };
+    });
+    setScanValue("");
   }
   function removeRow(i: number) {
     setForm((f) => ({
@@ -465,16 +499,32 @@ export default function PurchasesClient({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <p className="text-sm font-medium">البنود</p>
-              <button
-                type="button"
-                onClick={addRow}
-                className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition"
-              >
-                + بند
-              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  value={scanValue}
+                  onChange={(e) => setScanValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addByBarcode(scanValue);
+                    }
+                  }}
+                  dir="ltr"
+                  placeholder="📷 امسح باركود…"
+                  className="w-44 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary bg-card text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition"
+                >
+                  + بند
+                </button>
+              </div>
             </div>
+            {scanError && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-1.5 mb-2">{scanError}</p>}
             <div className="space-y-2">
               {form.items.map((it, i) => {
                 const q = Number(it.quantity) || 0;

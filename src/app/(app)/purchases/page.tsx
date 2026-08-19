@@ -36,7 +36,7 @@ export default async function PurchasesPage() {
       .order("name"),
     supabase
       .from("v_products")
-      .select("id, name, sku, base_unit_name")
+      .select("id, name, sku, base_unit_name, barcode")
       .eq("is_active", true)
       .order("name"),
     supabase.from("settings").select("value").eq("key", "usd_to_iqd_rate").maybeSingle(),
