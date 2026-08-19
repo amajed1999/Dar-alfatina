@@ -47,7 +47,7 @@ export default async function SalesPage() {
       .is("deleted_at", null)
       .eq("is_active", true)
       .order("name"),
-    supabase.from("v_products").select("id, name, sku").eq("is_active", true).order("name"),
+    supabase.from("v_products").select("id, name, sku, barcode").eq("is_active", true).order("name"),
     supabase.from("product_prices").select("product_id, price_tier_id, price"),
     supabase.from("settings").select("value").eq("key", "usd_to_iqd_rate").maybeSingle(),
   ]);
@@ -75,6 +75,7 @@ export default async function SalesPage() {
     id: p.id ?? "",
     name: p.name ?? "",
     sku: p.sku ?? "",
+    barcode: p.barcode ?? null,
   }));
 
   const defaultUsdRate = Number(usdSetting?.value ?? 1) || 1;

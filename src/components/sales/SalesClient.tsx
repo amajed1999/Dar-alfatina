@@ -26,7 +26,7 @@ export type MerchantLite = {
   status: "active" | "suspended";
   balance: number;
 };
-export type SalesProduct = { id: string; name: string; sku: string };
+export type SalesProduct = { id: string; name: string; sku: string; barcode?: string | null };
 type Warehouse = { id: string; name: string; is_default: boolean };
 
 type InvItem = {
@@ -150,6 +150,8 @@ export default function SalesClient(props: Props) {
   const [invEditId, setInvEditId] = useState<string | null>(null);
   const [invForm, setInvForm] = useState<InvForm>(() => newInvForm(defWh?.id));
   const [invError, setInvError] = useState<string | null>(null);
+  const [scanValue, setScanValue] = useState("");
+  const [scanError, setScanError] = useState<string | null>(null);
 
   function newInvForm(whId?: string): InvForm {
     return {
@@ -231,6 +233,42 @@ export default function SalesClient(props: Props) {
       ),
     }));
   }
+  function addByBarcode(code: string) {
+    const c = code.trim();
+    if (!c) return;
+    setScanError(null);
+    const prod = products.find((p) => (p.barcode ?? "") === c) ?? products.find((p) => p.sku === c);
+    if (!prod) {
+      setScanError(`لا يوجد منتج بالباركود/الرمز «${c}»`);
+      setScanValue("");
+      return;
+    }
+    const price = priceFor(prod.id, invMerchant);
+    setInvForm((f) => {
+      const existingIdx = f.items.findIndex((it) => it.product_id === prod.id);
+      if (existingIdx >= 0) {
+        return {
+          ...f,
+          items: f.items.map((it, idx) =>
+            idx === existingIdx ? { ...it, quantity: String((Number(it.quantity) || 0) + 1) } : it,
+          ),
+        };
+      }
+      const newRow: ItemRow = {
+        product_id: prod.id,
+        quantity: "1",
+        unit_price: price ? String(price) : "",
+        discount: "",
+      };
+      const emptyIdx = f.items.findIndex((it) => !it.product_id);
+      if (emptyIdx >= 0) {
+        return { ...f, items: f.items.map((it, idx) => (idx === emptyIdx ? newRow : it)) };
+      }
+      return { ...f, items: [...f.items, newRow] };
+    });
+    setScanValue("");
+  }
+
   function onMerchantChange(mid: string) {
     const m = merchantById(mid);
     setInvForm((f) => ({
@@ -656,10 +694,26 @@ export default function SalesClient(props: Props) {
           )}
 
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <p className="text-sm font-medium">البنود</p>
-              <button type="button" onClick={() => setInvForm((f) => ({ ...f, items: [...f.items, emptyItem()] }))} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition">+ بند</button>
+              <div className="flex items-center gap-2">
+                <input
+                  value={scanValue}
+                  onChange={(e) => setScanValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addByBarcode(scanValue);
+                    }
+                  }}
+                  dir="ltr"
+                  placeholder="📷 امسح باركود…"
+                  className="w-44 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary bg-card text-sm"
+                />
+                <button type="button" onClick={() => setInvForm((f) => ({ ...f, items: [...f.items, emptyItem()] }))} className="text-sm border border-border rounded-lg px-3 py-1.5 hover:bg-background transition">+ بند</button>
+              </div>
             </div>
+            {scanError && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-1.5 mb-2">{scanError}</p>}
             <div className="space-y-2">
               {invForm.items.map((it, i) => {
                 const q = Number(it.quantity) || 0, p = Number(it.unit_price) || 0, d = Number(it.discount) || 0;
