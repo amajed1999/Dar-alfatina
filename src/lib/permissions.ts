@@ -43,6 +43,8 @@ export const PERMISSIONS = {
     discountApprove: "sales.discount.approve",
     targetsView: "targets.view",
     targetsManage: "targets.manage",
+    quotationsView: "quotations.view",
+    quotationsCreate: "quotations.create",
   },
   orders: {
     view: "orders.view",

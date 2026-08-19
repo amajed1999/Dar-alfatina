@@ -1395,6 +1395,110 @@ export type Database = {
           },
         ]
       }
+      quotations: {
+        Row: {
+          converted_invoice_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          discount: number
+          exchange_rate: number
+          id: string
+          merchant_id: string
+          notes: string | null
+          quote_date: string
+          quote_number: string | null
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          converted_invoice_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          discount?: number
+          exchange_rate?: number
+          id?: string
+          merchant_id: string
+          notes?: string | null
+          quote_date?: string
+          quote_number?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          converted_invoice_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          discount?: number
+          exchange_rate?: number
+          id?: string
+          merchant_id?: string
+          notes?: string | null
+          quote_date?: string
+          quote_number?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotations_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotation_items: {
+        Row: {
+          discount: number
+          id: string
+          line_total: number | null
+          product_id: string
+          quantity: number
+          quotation_id: string
+          unit_price: number
+        }
+        Insert: {
+          discount?: number
+          id?: string
+          product_id: string
+          quantity?: number
+          quotation_id: string
+          unit_price?: number
+        }
+        Update: {
+          discount?: number
+          id?: string
+          product_id?: string
+          quantity?: number
+          quotation_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_items_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_targets: {
         Row: {
           created_at: string
@@ -2171,6 +2275,10 @@ export type Database = {
           merchants_count: number
           visits_count: number
         }[]
+      }
+      convert_quotation_to_invoice: {
+        Args: { p_quote: string }
+        Returns: string
       }
       reorder_suggestions: {
         Args: Record<string, never>
