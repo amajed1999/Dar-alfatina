@@ -9,18 +9,28 @@ type SettingsMap = Record<
   { value: unknown; description: string | null }
 >;
 
-// الحقول القابلة للتحرير مع نوعها
-const FIELDS: { key: string; label: string; type: "text" | "number" }[] = [
-  { key: "company_name", label: "اسم الشركة", type: "text" },
-  { key: "base_currency", label: "العملة الأساسية", type: "text" },
-  { key: "secondary_currency", label: "العملة الثانوية", type: "text" },
-  { key: "usd_to_iqd_rate", label: "سعر صرف الدولار (دينار)", type: "number" },
-  { key: "invoice_prefix", label: "بادئة فواتير البيع", type: "text" },
-  { key: "purchase_prefix", label: "بادئة فواتير الشراء", type: "text" },
-  { key: "payment_prefix", label: "بادئة سندات القبض", type: "text" },
-  { key: "tax_rate", label: "نسبة الضريبة %", type: "number" },
-  { key: "default_credit_limit", label: "السقف الائتماني الافتراضي", type: "number" },
+// الحقول القابلة للتحرير مع نوعها ومجموعتها
+type FieldDef = { key: string; label: string; type: "text" | "number"; group: string; hint?: string };
+const FIELDS: FieldDef[] = [
+  // عام
+  { key: "company_name", label: "اسم الشركة", type: "text", group: "عام" },
+  { key: "base_currency", label: "العملة الأساسية", type: "text", group: "عام" },
+  { key: "secondary_currency", label: "العملة الثانوية", type: "text", group: "عام" },
+  { key: "usd_to_iqd_rate", label: "سعر صرف الدولار (دينار)", type: "number", group: "عام" },
+  { key: "tax_rate", label: "نسبة الضريبة %", type: "number", group: "عام" },
+  { key: "default_credit_limit", label: "السقف الائتماني الافتراضي", type: "number", group: "عام" },
+  // الموافقات والحدود التشغيلية
+  { key: "expense_approval_threshold", label: "حدّ اعتماد المصروف (د.ع)", type: "number", group: "الموافقات والحدود", hint: "المصروف بمبلغ أكبر أو يساوي هذا يحتاج اعتماداً. صفر = كل المصاريف تحتاج اعتماداً." },
+  { key: "discount_approval_threshold_pct", label: "نسبة الخصم التي تتطلب اعتماداً %", type: "number", group: "الموافقات والحدود", hint: "خصم الفاتورة الذي يتجاوز هذه النسبة يتطلب صلاحية اعتماد الخصومات." },
+  { key: "debt_reminder_min_days", label: "أيام التأخّر لتذكير الديون", type: "number", group: "الموافقات والحدود", hint: "الفواتير الأقدم من هذا العدد من الأيام تُعتبر متأخرة في التذكير اليومي." },
+  { key: "reorder_cover_days", label: "أيام التغطية لاقتراح إعادة الطلب", type: "number", group: "الموافقات والحدود", hint: "كمية الشراء المقترحة تكفي لتغطية الطلب المتوقّع لهذا العدد من الأيام." },
+  // بادئات الترقيم
+  { key: "invoice_prefix", label: "بادئة فواتير البيع", type: "text", group: "بادئات الترقيم" },
+  { key: "purchase_prefix", label: "بادئة فواتير الشراء", type: "text", group: "بادئات الترقيم" },
+  { key: "payment_prefix", label: "بادئة سندات القبض", type: "text", group: "بادئات الترقيم" },
+  { key: "quotation_prefix", label: "بادئة عروض الأسعار", type: "text", group: "بادئات الترقيم" },
 ];
+const GROUPS = ["عام", "الموافقات والحدود", "بادئات الترقيم"];
 
 export default function SettingsForm({ settings }: { settings: SettingsMap }) {
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -58,22 +68,28 @@ export default function SettingsForm({ settings }: { settings: SettingsMap }) {
       onSubmit={submit}
       className="bg-card border border-border rounded-xl p-5 max-w-2xl space-y-4"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {FIELDS.map((f) => (
-          <div key={f.key}>
-            <label className="block text-sm mb-1">{f.label}</label>
-            <input
-              type={f.type === "number" ? "number" : "text"}
-              value={values[f.key]}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, [f.key]: e.target.value }))
-              }
-              dir={f.type === "number" ? "ltr" : undefined}
-              className="w-full border border-border rounded-lg px-3 py-2 outline-none focus:border-primary"
-            />
+      {GROUPS.map((g) => (
+        <div key={g} className="space-y-3">
+          <h2 className="text-sm font-semibold text-primary border-b border-border pb-1">{g}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {FIELDS.filter((f) => f.group === g).map((f) => (
+              <div key={f.key}>
+                <label className="block text-sm mb-1">{f.label}</label>
+                <input
+                  type={f.type === "number" ? "number" : "text"}
+                  value={values[f.key]}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, [f.key]: e.target.value }))
+                  }
+                  dir={f.type === "number" ? "ltr" : undefined}
+                  className="w-full border border-border rounded-lg px-3 py-2 outline-none focus:border-primary"
+                />
+                {f.hint && <p className="text-xs text-muted mt-1">{f.hint}</p>}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
 
       {msg && (
         <p
